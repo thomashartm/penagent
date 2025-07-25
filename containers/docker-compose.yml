@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  playwright:
+    build:
+      context: .
+      dockerfile: playwright.Dockerfile
+    container_name: pentest-playwright
+    working_dir: /app
+    tty: true
+    # Optionally mount your app code
+    # volumes:
+    #   - ../src:/app
+
+  zap:
+    image: owasp/zap2docker-stable
+    container_name: pentest-zap
+    ports:
+      - "8090:8090"  # ZAP API/UI
+    command: ["zap.sh", "-daemon", "-host", "0.0.0.0", "-port", "8090", "-config", "api.disablekey=true"]
+    tty: true
+
+  kali:
+    build:
+      context: .
+      dockerfile: kali.Dockerfile
+    container_name: kali
+    tty: true
+    command: tail -f /dev/null 

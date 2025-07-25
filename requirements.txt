@@ -1,0 +1,10 @@
+langgraph
+click
+rich
+requests
+playwright
+pinecone-client
+openai
+ollama
+pytest
+flake8 
