@@ -1,8 +1,14 @@
 import json
 from datetime import datetime
+import os
 
 LOG_FILE = 'process_logs.json'
 DEBUG_LOG_FILE = 'agent_debug.log'
+
+def set_log_paths(log_file, debug_log_file):
+    global LOG_FILE, DEBUG_LOG_FILE
+    LOG_FILE = log_file
+    DEBUG_LOG_FILE = debug_log_file
 
 def log_event(event_type, content):
     entry = {

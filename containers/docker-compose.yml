@@ -13,7 +13,7 @@ services:
     #   - ../src:/app
 
   zap:
-    image: owasp/zap2docker-stable
+    image: ghcr.io/zaproxy/zaproxy:stable
     container_name: pentest-zap
     ports:
       - "8090:8090"  # ZAP API/UI

@@ -13,7 +13,7 @@ Pentest-Agent is an autonomous pentesting AI agent built with Python and the lan
 - Python 3.9+
 - [Poetry](https://python-poetry.org/docs/#installation)
 - [Ollama](https://ollama.com/download) (for local LLM backend)
-- [Docker](https://docs.docker.com/get-docker/) (for KaliContainerTool)
+- [Docker](https://docs.docker.com/get-docker/) (for containerized tools)
 
 ### Clone the Repository
 ```sh
@@ -43,29 +43,35 @@ poetry shell
 
 ---
 
-### Kali Linux Docker Container Setup (for KaliContainerTool)
+### Containerized Pentest Environment (Docker Compose)
 
-1. **Install Docker** ([instructions](https://docs.docker.com/get-docker/))
-2. **Pull and run a Kali container named `kali`:**
-   ```sh
-   docker run -d --name kali -it kalilinux/kali-rolling tail -f /dev/null
-   ```
-3. **Install Metasploit and other tools inside the container:**
-   ```sh
-   docker exec -it kali bash
-   # Inside the container:
-   apt update && apt install -y metasploit-framework gobuster hydra nmap
-   exit
-   ```
-4. **Verify the container is running:**
-   ```sh
-   docker ps
-   # Should show a container named 'kali'
-   ```
-5. **(Optional) Install more tools as needed:**
-   ```sh
-   docker exec -it kali apt install -y <toolname>
-   ```
+This project provides a full pentest environment using Docker Compose, including:
+- **Kali Linux** (with common tools pre-installed)
+- **Playwright** (for browser automation)
+- **OWASP ZAP** (for web app security scanning)
+
+#### Start All Services
+```sh
+cd containers
+# Build and start all containers in the background
+docker-compose up --build -d
+```
+
+#### Verify Services
+- **Kali**: Should be running as `kali` (with tools like metasploit, gobuster, hydra, nmap, etc.)
+- **Playwright**: Ready for browser-based automation
+- **ZAP**: Accessible at [http://localhost:8090](http://localhost:8090)
+
+Check running containers:
+```sh
+docker ps
+```
+
+#### (Optional) Add More Tools to Kali
+Edit `containers/kali.Dockerfile` and rebuild:
+```sh
+docker-compose build kali
+```
 
 ---
 

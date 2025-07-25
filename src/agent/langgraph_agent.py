@@ -1,67 +1,46 @@
 from src.agent.planner import Planner
 from src.agent.memory import ShortTermMemory
-from src.agent.logging_utils import log_thought, log_action, log_observation, log_debug
+from src.agent.logging_utils import log_thought, log_action, log_observation, log_debug, set_log_paths
+from src.prompts.agent_instructions import AGENT_SYSTEM_PROMPT
+from src.prompts.xss_loop import XSS_SYSTEM_PROMPT, XSS_PAYLOADS
 import re
+import os
 
 class LangGraphAgent:
     """Autonomous pentesting agent using langgraph."""
 
-    XSS_PAYLOADS = [
-        '<script>alert(1)</script>',
-        '" onmouseover=alert(1) "',
-        "'><img src=x onerror=alert(1)>",
-        '<svg/onload=alert(1)>',
-        '<body onload=alert(1)>',
-        '<iframe src=javascript:alert(1)>',
-        '<math href="javascript:alert(1)">CLICK',
-    ]
-
-    def __init__(self, tools=None, llm=None):
-        """Initialize agent with tools and LLM backend."""
+    def __init__(self, tools=None, llm=None, output_dir=None):
+        """Initialize agent with tools, LLM backend, and output directory."""
         self.tools = {tool.__class__.__name__: tool for tool in (tools or [])}
         self.llm = llm
         self.memory = ShortTermMemory()
         self.planner = Planner()
+        self.output_dir = output_dir or '.'
+        os.makedirs(self.output_dir, exist_ok=True)
+        set_log_paths(
+            os.path.join(self.output_dir, 'process_logs.json'),
+            os.path.join(self.output_dir, 'agent_debug.log')
+        )
 
     def plan(self, goal):
-        """Break down high-level goal into discrete steps."""
         steps = self.planner.plan(goal)
         return steps
 
-    def thought(self, context):
-        system_prompt = """
-You are an autonomous pentesting agent.
-For each step, select and use one of the following tools by outputting a command in the format:
-Use <ToolName>: <arguments>
-Available tools:
-- ShellTool: for running shell commands (e.g., nmap, sqlmap, nslookup, dig, traceroute)
-- PythonREPLTool: for running Python code
-- WebBrowserTool: for browsing or screenshots
-- WebSearchTool: for searching the web
-- RAGTool: for retrieving domain-specific docs
-- KaliContainerTool: for running advanced Linux and pentest commands inside a Kali Linux Docker container (e.g., metasploit, hydra, nikto, gobuster, etc.)
-Always use ShellTool for basic network scanning, port scanning, or DNS lookups. Use KaliContainerTool for advanced Linux/pentest tools.
-When testing for XSS, try multiple payloads (e.g., <script>alert(1)</script>, "><img src=x onerror=alert(1)>, etc.). After each test, analyze the output for evidence of XSS (e.g., reflected payload, script execution). If no vulnerability is found, try the next payload. Continue until a vulnerability is found or all payloads are exhausted.
-If a command fails with 'command not found', use KaliContainerTool to install it:
-Use KaliContainerTool: apt update && apt install -y <tool>
-Then retry the original command.
-Only output a single line in the format above. Do not explain your reasoning.
-Examples:
-Task: Test for reflected XSS on https://example.com/search?q=test.
-Use WebBrowserTool: browse https://example.com/search?q=<script>alert(1)</script>
-Task: Test for reflected XSS on https://example.com/search?q=test with payload '" onmouseover=alert(1) "'.
-Use WebBrowserTool: browse https://example.com/search?q=" onmouseover=alert(1) "
-Task: Run metasploit to scan example.com.
-Use KaliContainerTool: msfconsole -q -x 'db_nmap -A example.com; exit'
-Task: Use gobuster to enumerate directories on https://example.com.
-Use KaliContainerTool: gobuster dir -u https://example.com -w /usr/share/wordlists/dirb/common.txt
-Task: Scan example.com for open ports.
-Use ShellTool: nmap -Pn example.com
-"""
-        prompt = (
-            system_prompt +
+    def agent_prompt(self, context):
+        return (
+            AGENT_SYSTEM_PROMPT +
             f"Context: {context}\nHistory: {self.memory.get_history()}\nWhat should the agent do next?"
         )
+
+    def xss_prompt(self, context):
+        return (
+            AGENT_SYSTEM_PROMPT +
+            XSS_SYSTEM_PROMPT +
+            f"Context: {context}\nHistory: {self.memory.get_history()}\nWhat should the agent do next?"
+        )
+
+    def thought(self, context, xss_mode=False):
+        prompt = self.xss_prompt(context) if xss_mode else self.agent_prompt(context)
         thought = self.llm.generate(prompt)
         log_thought(thought)
         self.memory.add({'type': 'Thought', 'content': thought})
@@ -134,14 +113,14 @@ Use ShellTool: nmap -Pn example.com
                     url = m.group(1)
                     break
             if url:
-                for payload in self.XSS_PAYLOADS:
+                for payload in XSS_PAYLOADS:
                     test_url = re.sub(r'(q=)[^&]*', f"\\1{payload}", url) if 'q=' in url else url
                     context['current_step'] = f"Testing XSS payload: {payload}"
                     thought = f"Use WebBrowserTool: browse {test_url}"
                     action_result = self.action(thought)
                     obs = self.observation(action_result)
                     # Analyze with LLM if XSS is found
-                    analysis_prompt = f"Analyze the following page content for evidence of XSS: {action_result.get('content', '')}\nPayload: {payload}\nDid the payload appear in the response or trigger script execution?"
+                    analysis_prompt = f"{XSS_SYSTEM_PROMPT}\nAnalyze the following page content for evidence of XSS: {action_result.get('content', '')}\nPayload: {payload}\nDid the payload appear in the response or trigger script execution?"
                     analysis = self.llm.generate(analysis_prompt)
                     log_thought(f"XSS Analysis for payload '{payload}': {analysis}")
                     self.memory.add({'type': 'Thought', 'content': f"XSS Analysis for payload '{payload}': {analysis}"})

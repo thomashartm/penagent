@@ -14,6 +14,8 @@ from src.tools.web_search_tool import WebSearchTool
 from src.tools.rag_tool import RAGTool
 from src.tools.kali_container_tool import KaliContainerTool
 from src.agent.reporting import generate_report
+import os
+import uuid
 
 console = Console()
 
@@ -38,6 +40,12 @@ def main():
 @main.command()
 @click.option('--task', required=True, help='High-level pentest goal/task')
 def run(task):
+    # Create outputs directory and unique session directory
+    os.makedirs('outputs', exist_ok=True)
+    session_id = str(uuid.uuid4())
+    session_dir = os.path.join('outputs', session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    console.print(f"[bold magenta]Session UUID:[/bold magenta] {session_id}")
     console.print(f"[bold green]Running pentest task:[/bold green] {task}")
     # Instantiate tools and LLM
     tools = [
@@ -49,10 +57,10 @@ def run(task):
         KaliContainerTool()
     ]
     llm = OllamaLLM()
-    agent = LangGraphAgent(tools=tools, llm=llm)
+    agent = LangGraphAgent(tools=tools, llm=llm, output_dir=session_dir)
     history = agent.run(task)
     stream_history(history)
-    console.print("[bold green]Pentest task complete. See process_logs.json for details.[/bold green]")
+    console.print(f"[bold green]Pentest task complete. See {session_dir} for all outputs and logs.[/bold green]")
 
 @main.group()
 def tools():
