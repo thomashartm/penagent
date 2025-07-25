@@ -1,5 +1,7 @@
 # Pentest-Agent: Autonomous Pentesting AI Agent
 
+> **⚠️ Work in Progress:** This project is under active development and is not yet production-ready. Features, APIs, and behaviors may change frequently.
+
 ## Overview
 Pentest-Agent is an autonomous pentesting AI agent built with Python and the langgraph framework, inspired by Agent_PenX. It orchestrates multiple tools (shell, Python REPL, web browsing, RAG, web search) to achieve high-level security goals, logs every step, and generates professional Markdown reports.
 
