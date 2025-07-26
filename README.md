@@ -3,7 +3,26 @@
 > **⚠️ Work in Progress:** This project is under active development and is not yet production-ready. Features, APIs, and behaviors may change frequently.
 
 ## Overview
-Pentest-Agent is an autonomous pentesting AI agent built with Python and the langgraph framework, inspired by Agent_PenX. It orchestrates multiple tools (shell, Python REPL, web browsing, RAG, web search) to achieve high-level security goals, logs every step, and generates professional Markdown reports.
+Pentest-Agent is an autonomous pentesting AI agent built with Python and the langgraph framework, inspired by Agent_PenX. It uses a graph-based, stateful workflow driven by LangGraph and instrumented via MCP (Model Context Protocol) servers. The agent orchestrates multiple tools (Kali Linux, web search, OWASP ZAP, RAG) to achieve high-level security goals, logs every step, and generates professional Markdown reports.
+
+---
+
+## Architecture
+
+### MCP Server Layer
+Each pentest tool runs as a standalone FastAPI-based MCP server:
+- **Kali MCP Server** (Port 8001): Executes shell commands in Kali Linux container
+- **WebSearch MCP Server** (Port 8002): Performs web searches using DuckDuckGo
+- **OWASP MCP Server** (Port 8003): Web application security testing and spidering
+- **RAG MCP Server** (Port 8004): Knowledge base operations with pentest methodologies
+- **ZAP MCP Server** (Port 8005): Interfaces with OWASP ZAP daemon for web app scanning
+
+### LangGraph Workflow
+The agent uses LangGraph to define and execute stateful workflows as directed graphs:
+- **LLM Node**: Wraps Ollama calls for reasoning
+- **MCP Client Node**: Makes HTTP calls to MCP tool servers
+- **Planner Node**: Breaks high-level tasks into graph sub-tasks
+- **Logger Node**: Writes thought/action/observation state to outputs
 
 ---
 
@@ -39,7 +58,7 @@ A modern web-based frontend is available using [Streamlit](https://streamlit.io/
 
 4. **Using the UI**
    - Enter your pentest goal or select a prompt card, then click **Send**.
-   - The right panel streams the agent’s Thought → Action → Observation cycles live.
+   - The right panel streams the agent's Thought → Action → Observation cycles live.
    - The bottom panel shows discovered vulnerabilities/findings in a table.
    - The top toolbar shows tool/container status and prompt history.
 
@@ -51,7 +70,7 @@ A modern web-based frontend is available using [Streamlit](https://streamlit.io/
 - Python 3.9+
 - [Poetry](https://python-poetry.org/docs/#installation)
 - [Ollama](https://ollama.com/download) (for local LLM backend)
-- [Docker](https://docs.docker.com/get-docker/) (for containerized tools)
+- [Docker](https://docs.docker.com/get-docker/) (for containerized MCP servers)
 
 ### Clone the Repository
 ```sh
@@ -81,34 +100,44 @@ poetry shell
 
 ---
 
-### Containerized Pentest Environment (Docker Compose)
+### MCP Server Environment (Docker Compose)
 
-This project provides a full pentest environment using Docker Compose, including:
-- **Kali Linux** (with common tools pre-installed)
-- **Playwright** (for browser automation)
-- **OWASP ZAP** (for web app security scanning)
+This project provides a full pentest environment using Docker Compose with MCP servers:
 
-#### Start All Services
+#### Start All MCP Servers (Detached Mode)
 ```sh
-cd containers
-# Build and start all containers in the background
+cd mcp_servers
+# Build and start all containers in detached mode (background)
 docker-compose up --build -d
 ```
 
-#### Verify Services
-- **Kali**: Should be running as `kali` (with tools like metasploit, gobuster, hydra, nmap, etc.)
-- **Playwright**: Ready for browser-based automation
-- **ZAP**: Accessible at [http://localhost:8090](http://localhost:8090)
+#### MCP Server Endpoints
+- **Kali MCP**: `http://localhost:8001` - Shell command execution
+- **WebSearch MCP**: `http://localhost:8002` - Web search functionality
+- **OWASP MCP**: `http://localhost:8003` - Web app security testing
+- **RAG MCP**: `http://localhost:8004` - Knowledge base operations
+- **ZAP MCP**: `http://localhost:8005` - OWASP ZAP web app scanning
+- **ZAP Daemon**: `http://localhost:8090` - ZAP API/UI (internal use only)
 
+#### Verify Services
 Check running containers:
 ```sh
-docker ps
+docker-compose ps
 ```
 
-#### (Optional) Add More Tools to Kali
-Edit `containers/kali.Dockerfile` and rebuild:
+Check MCP server logs:
 ```sh
-docker-compose build kali
+docker-compose logs [service-name]
+# Example: docker-compose logs zap-mcp
+```
+
+#### Stop Services
+```sh
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
 ```
 
 ---
@@ -119,17 +148,19 @@ All CLI commands use the Poetry virtual environment. Use `poetry run pentest-age
 
 ### Run a Pentest Task
 ```sh
-poetry run pentest-agent run --task "Scan https://public-firing-range.appspot.com/ for Reflected XSS"
+poetry run pentest-agent run --command "Scan https://public-firing-range.appspot.com/ for Reflected XSS"
 ```
 
-### List Available Tools
+### Example Commands
 ```sh
-poetry run pentest-agent tools list
-```
+# Network reconnaissance
+poetry run pentest-agent run --command "Perform network reconnaissance on target.com"
 
-### Generate a Markdown Report
-```sh
-poetry run pentest-agent report --input process_logs.json --output report.md
+# Web application testing
+poetry run pentest-agent run --command "Test https://example.com for OWASP Top 10 vulnerabilities"
+
+# Information gathering
+poetry run pentest-agent run --command "Gather information about target organization"
 ```
 
 ---
@@ -149,11 +180,28 @@ poetry run flake8 src/
 ---
 
 ## Project Structure
-- `src/` — All source code
-- `.gitignore` — Excludes venv, cache, logs, build artifacts
-- `pyproject.toml` — Poetry dependency management
-- `requirements.txt` — pip compatibility (for reference only)
-- `README.md` — This file
+```
+cognizant-vibe/
+├── src/
+│   ├── agent/
+│   │   ├── graph_client.py          # Main GraphClient class
+│   │   ├── langgraph_workflow.py    # LangGraph workflow definition
+│   │   └── nodes/                   # Workflow nodes
+│   ├── frontend/                    # Streamlit web UI
+│   └── mcp_servers/                 # MCP server code (legacy)
+├── mcp_servers/
+│   ├── docker-compose.yml           # MCP server orchestration
+│   ├── *.Dockerfile                 # Container definitions
+│   └── src/
+│       ├── kali/                    # Kali MCP server
+│       ├── websearch/               # WebSearch MCP server
+│       ├── owasp/                   # OWASP MCP server
+│       ├── rag/                     # RAG MCP server
+│       └── zap/                     # ZAP MCP server
+├── outputs/                         # Job outputs and logs
+├── pyproject.toml                   # Poetry configuration
+└── README.md                        # This file
+```
 
 ---
 
