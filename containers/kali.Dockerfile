@@ -8,7 +8,7 @@ RUN apt-get update && \
     nmap \
     curl \
     dnsutils \
-    netcat \
+    netcat-openbsd \
     python3 \
     python3-pip \
     git \

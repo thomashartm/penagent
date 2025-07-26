@@ -8,9 +8,8 @@ services:
     container_name: pentest-playwright
     working_dir: /app
     tty: true
-    # Optionally mount your app code
-    # volumes:
-    #   - ../src:/app
+    volumes:
+      - ../outputs:/app/outputs
 
   zap:
     image: ghcr.io/zaproxy/zaproxy:stable

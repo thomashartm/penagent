@@ -7,6 +7,44 @@ Pentest-Agent is an autonomous pentesting AI agent built with Python and the lan
 
 ---
 
+## Frontend (Streamlit Web UI)
+
+A modern web-based frontend is available using [Streamlit](https://streamlit.io/).
+
+### How to Run the Frontend
+
+1. **Install dependencies**
+   - If using Poetry:
+     ```sh
+     poetry install
+     ```
+   - Or with pip:
+     ```sh
+     pip install -r requirements.txt
+     ```
+
+2. **Start the Streamlit app**
+   - If using Poetry (recommended):
+     ```sh
+     poetry run streamlit run src/frontend/app.py
+     ```
+   - If using a virtual environment:
+     ```sh
+     source .venv/bin/activate
+     streamlit run src/frontend/app.py
+     ```
+
+3. **Open your browser**
+   - The app will open automatically, or visit [http://localhost:8501](http://localhost:8501)
+
+4. **Using the UI**
+   - Enter your pentest goal or select a prompt card, then click **Send**.
+   - The right panel streams the agent’s Thought → Action → Observation cycles live.
+   - The bottom panel shows discovered vulnerabilities/findings in a table.
+   - The top toolbar shows tool/container status and prompt history.
+
+---
+
 ## 1. Setup
 
 ### Prerequisites

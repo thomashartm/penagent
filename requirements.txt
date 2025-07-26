@@ -7,4 +7,6 @@ pinecone-client
 openai
 ollama
 pytest
-flake8 
+flake8
+streamlit>=1.25.0
+streamlit-aggrid 

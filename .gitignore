@@ -12,3 +12,4 @@ dist/
 .poetry/
 poetry.lock
 process_logs.json 
+outputs/

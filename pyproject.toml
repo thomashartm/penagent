@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "src" }]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
+python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
 langgraph = "*"
 click = "*"
 rich = "*"
@@ -16,6 +16,8 @@ playwright = "*"
 pinecone-client = "*"
 openai = "*"
 ollama = "*"
+streamlit-aggrid = "*"
+streamlit = "^1.47.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"
