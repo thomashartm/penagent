@@ -7,10 +7,11 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for FastMCP
-RUN pip install fastmcp requests beautifulsoup4
+COPY src/websearch/requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
 # Copy MCP server code
 COPY src/websearch/websearch_server.py /app/websearch_server.py
 WORKDIR /app
 
-CMD ["python", "websearch_server.py"] 
+CMD ["python3", "websearch_server.py"] 

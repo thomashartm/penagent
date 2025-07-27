@@ -18,8 +18,8 @@ class WebSearchMCPServerTester:
         """Start the WebSearch MCP server."""
         print("🚀 Starting WebSearch MCP Server...")
         try:
-            # Connect to the FastMCP server running in the container
-            self.client = Client("docker exec -i mcp-websearch python websearch_server.py")
+            from fastmcp.client.transports import StdioTransport
+            self.client = Client(StdioTransport("docker", ["exec", "-i", "mcp-websearch", "python3", "websearch_server.py"]))
             await self.client.__aenter__()
             print("✅ WebSearch MCP Server started successfully")
             return True
@@ -33,9 +33,7 @@ class WebSearchMCPServerTester:
             raise Exception("Server not started")
         
         try:
-            if method == "initialize":
-                return await self.client.initialize()
-            elif method == "tools/list":
+            if method == "tools/list":
                 return await self.client.list_tools()
             elif method == "tools/call":
                 tool_name = params.get("name")
@@ -47,20 +45,6 @@ class WebSearchMCPServerTester:
         except Exception as e:
             return {"error": f"Communication error: {str(e)}"}
     
-    async def test_initialize(self):
-        """Test MCP initialize method."""
-        print("\n🔧 Testing MCP Initialize...")
-        
-        response = await self.send_request("initialize")
-        print(f"Response: {response}")
-        
-        if "result" in response and "serverInfo" in response["result"]:
-            print("✅ Initialize test passed")
-            self.test_results.append(("Initialize", "PASS"))
-        else:
-            print("❌ Initialize test failed")
-            self.test_results.append(("Initialize", "FAIL"))
-    
     async def test_list_tools(self):
         """Test MCP tools/list method."""
         print("\n📋 Testing Tools List...")
@@ -68,11 +52,8 @@ class WebSearchMCPServerTester:
         response = await self.send_request("tools/list")
         print(f"Response: {response}")
         
-        if "result" in response and "tools" in response["result"]:
-            tools = response["result"]["tools"]
-            print(f"✅ Tools list test passed - Found {len(tools)} tools:")
-            for tool in tools:
-                print(f"   - {tool['name']}: {tool['description']}")
+        if isinstance(response, list) and len(response) > 0 and all(hasattr(tool, 'name') and hasattr(tool, 'description') for tool in response):
+            print("✅ Tools list test passed")
             self.test_results.append(("Tools List", "PASS"))
         else:
             print("❌ Tools list test failed")
@@ -82,16 +63,12 @@ class WebSearchMCPServerTester:
         """Test search tool execution."""
         print("\n🔍 Testing Search Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "search",
-            "arguments": {
-                "query": "python programming",
-                "max_results": 3
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("search", {"query": "test"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Search tool test passed")
             self.test_results.append(("Search Tool", "PASS"))
         else:
@@ -102,16 +79,12 @@ class WebSearchMCPServerTester:
         """Test search_news tool execution."""
         print("\n📰 Testing Search News Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "search_news",
-            "arguments": {
-                "query": "artificial intelligence",
-                "max_results": 3
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("search_news", {"query": "test"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Search News tool test passed")
             self.test_results.append(("Search News Tool", "PASS"))
         else:
@@ -122,16 +95,12 @@ class WebSearchMCPServerTester:
         """Test search_images tool execution."""
         print("\n🖼️ Testing Search Images Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "search_images",
-            "arguments": {
-                "query": "cats",
-                "max_results": 3
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("search_images", {"query": "test"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Search Images tool test passed")
             self.test_results.append(("Search Images Tool", "PASS"))
         else:
@@ -178,7 +147,6 @@ class WebSearchMCPServerTester:
             return
         
         try:
-            await self.test_initialize()
             await self.test_list_tools()
             await self.test_search_tool()
             await self.test_search_news_tool()

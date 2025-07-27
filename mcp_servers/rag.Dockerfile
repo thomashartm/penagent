@@ -7,10 +7,11 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for FastMCP
-RUN pip install fastmcp
+COPY src/rag/requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
 # Copy MCP server code
 COPY src/rag/rag_server.py /app/rag_server.py
 WORKDIR /app
 
-CMD ["python", "rag_server.py"] 
+CMD ["sleep", "infinity"] 

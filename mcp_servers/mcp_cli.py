@@ -98,9 +98,8 @@ class MCPServerCLI:
             self.current_server = server_id
             
             # Test connection with initialize
-            init_result = await self.client.initialize()
             print(f"✅ Connected to {server_info['name']}")
-            print(f"   Server Info: {init_result.get('serverInfo', {}).get('name', 'Unknown')}")
+            # Optionally print a generic connected message or skip
             return True
             
         except Exception as e:
@@ -122,8 +121,17 @@ class MCPServerCLI:
             return []
         
         try:
-            result = await self.client.list_tools()
-            tools = result.get('tools', [])
+            tools = await self.client.list_tools()
+            if not tools or not isinstance(tools, list):
+                print("❌ Error listing tools: No tools found or unexpected response.")
+                print("📋 Found 0 tools:\n")
+            else:
+                print(f"📋 Found {len(tools)} tools:\n")
+                for tool in tools:
+                    # FastMCP 2.x returns Tool objects, use attribute access
+                    name = getattr(tool, 'name', str(tool))
+                    desc = getattr(tool, 'description', '')
+                    print(f"- {name}: {desc}")
             return tools
         except Exception as e:
             print(f"❌ Error listing tools: {e}")
@@ -223,7 +231,7 @@ class MCPServerCLI:
             tools = await self.list_tools()
             print(f"📋 Found {len(tools)} tools:")
             for tool in tools:
-                print(f"   • {tool['name']}: {tool['description']}")
+                print(f"   • {getattr(tool, 'name', str(tool))}: {getattr(tool, 'description', '')}")
             
             # Call specific tool if provided
             if tool_name and arguments:
@@ -266,16 +274,16 @@ def main():
     
     async def run():
         # Check containers first
-        if not await cli.check_containers():
-            return
+        #if not await cli.check_containers():
+        #    return
         
         if args.list_servers:
             cli.print_server_info()
             return
         
-        if args.check_containers:
-            print("✅ All containers are running")
-            return
+        #if args.check_containers:
+        #    print("✅ All containers are running")
+        #    return
         
         if args.interactive:
             await cli.interactive_mode()

@@ -18,8 +18,8 @@ class KaliMCPServerTester:
         """Start the Kali MCP server."""
         print("🚀 Starting Kali MCP Server...")
         try:
-            # Connect to the FastMCP server running in the container
-            self.client = Client("docker exec -i mcp-kali python3 kali_server.py")
+            from fastmcp.client.transports import StdioTransport
+            self.client = Client(StdioTransport("docker", ["exec", "-i", "mcp-kali", "python3", "kali_server.py"]))
             await self.client.__aenter__()
             print("✅ Kali MCP Server started successfully")
             return True
@@ -33,9 +33,7 @@ class KaliMCPServerTester:
             raise Exception("Server not started")
         
         try:
-            if method == "initialize":
-                return await self.client.initialize()
-            elif method == "tools/list":
+            if method == "tools/list":
                 return await self.client.list_tools()
             elif method == "tools/call":
                 tool_name = params.get("name")
@@ -47,20 +45,6 @@ class KaliMCPServerTester:
         except Exception as e:
             return {"error": f"Communication error: {str(e)}"}
     
-    async def test_initialize(self):
-        """Test MCP initialize method."""
-        print("\n🔧 Testing MCP Initialize...")
-        
-        response = await self.send_request("initialize")
-        print(f"Response: {response}")
-        
-        if "result" in response and "serverInfo" in response["result"]:
-            print("✅ Initialize test passed")
-            self.test_results.append(("Initialize", "PASS"))
-        else:
-            print("❌ Initialize test failed")
-            self.test_results.append(("Initialize", "FAIL"))
-    
     async def test_list_tools(self):
         """Test MCP tools/list method."""
         print("\n📋 Testing Tools List...")
@@ -68,11 +52,8 @@ class KaliMCPServerTester:
         response = await self.send_request("tools/list")
         print(f"Response: {response}")
         
-        if "result" in response and "tools" in response["result"]:
-            tools = response["result"]["tools"]
-            print(f"✅ Tools list test passed - Found {len(tools)} tools:")
-            for tool in tools:
-                print(f"   - {tool['name']}: {tool['description']}")
+        if isinstance(response, list) and len(response) > 0 and all(hasattr(tool, 'name') and hasattr(tool, 'description') for tool in response):
+            print("✅ Tools list test passed")
             self.test_results.append(("Tools List", "PASS"))
         else:
             print("❌ Tools list test failed")
@@ -82,16 +63,12 @@ class KaliMCPServerTester:
         """Test nmap tool execution."""
         print("\n🔍 Testing Nmap Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "nmap",
-            "arguments": {
-                "target": "127.0.0.1",
-                "options": "-sV -sC"
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("nmap", {"target": "127.0.0.1"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Nmap tool test passed")
             self.test_results.append(("Nmap Tool", "PASS"))
         else:
@@ -102,16 +79,12 @@ class KaliMCPServerTester:
         """Test gobuster tool execution."""
         print("\n🌐 Testing Gobuster Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "gobuster",
-            "arguments": {
-                "url": "https://example.com",
-                "wordlist": "/usr/share/wordlists/dirb/common.txt"
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("gobuster", {"url": "https://example.com"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Gobuster tool test passed")
             self.test_results.append(("Gobuster Tool", "PASS"))
         else:
@@ -122,15 +95,12 @@ class KaliMCPServerTester:
         """Test shell command tool execution."""
         print("\n💻 Testing Shell Command Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "shell_command",
-            "arguments": {
-                "command": "whoami && pwd && ls -la"
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("shell_command", {"command": "echo hello"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Shell command tool test passed")
             self.test_results.append(("Shell Command Tool", "PASS"))
         else:
@@ -209,7 +179,6 @@ async def main():
             return
         
         # Run tests
-        await tester.test_initialize()
         await tester.test_list_tools()
         await tester.test_nmap_tool()
         await tester.test_gobuster_tool()

@@ -17,10 +17,8 @@ class MCPTestRunner:
         self.test_results = []
         self.test_files = [
             "test_kali_mcp_server.py",
-            "test_zap_mcp_server.py",
             "test_websearch_mcp_server.py",
-            "test_rag_mcp_server.py",
-            "test_discovery_mcp_server.py"
+            "test_rag_mcp_server.py"
         ]
     
     async def run_test(self, test_file: str) -> Tuple[str, bool]:
@@ -66,7 +64,7 @@ class MCPTestRunner:
         """Check if required containers are running."""
         print("🔍 Checking if required containers are running...")
         
-        required_containers = ["mcp-kali", "mcp-zap", "mcp-websearch", "mcp-rag", "mcp-discovery"]
+        required_containers = ["mcp-kali", "mcp-websearch", "mcp-rag"]
         running_containers = []
         
         try:
@@ -89,7 +87,7 @@ class MCPTestRunner:
             if missing_containers:
                 print(f"❌ Missing containers: {', '.join(missing_containers)}")
                 print("💡 Please start the containers first:")
-                print("   cd mcp_servers && docker-compose up -d kali zap websearch rag discovery")
+                print("   cd mcp_servers && docker-compose up -d kali websearch rag")
                 return False
             else:
                 print("✅ All required containers are running")

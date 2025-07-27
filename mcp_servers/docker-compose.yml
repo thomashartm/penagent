@@ -7,9 +7,7 @@
 # Services:
 #   - kali:      Kali Linux container with proper MCP server for shell/pentest tools (kali.Dockerfile)
 #   - websearch: Web search MCP server (websearch.Dockerfile)
-#   - discovery: Lightweight web app discovery/spidering MCP server (discovery.Dockerfile)
 #   - rag:       RAG knowledge base MCP server (rag.Dockerfile)
-#   - zap:       Combined ZAP daemon + proper MCP server (zap_combined.Dockerfile, port 8090)
 #   - playwright: Playwright browser automation (playwright.Dockerfile)
 #
 # Container Naming Convention:
@@ -32,23 +30,6 @@ services:
     volumes:
       - ../outputs:/app/outputs
 
-  zap:
-    build:
-      context: .
-      dockerfile: zap_combined.Dockerfile  # Combined ZAP daemon + MCP server
-    container_name: mcp-zap
-    ports:
-      - "8090:8090"  # ZAP API/UI (for debugging/access)
-    networks:
-      - mcp-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/JSON/core/view/version/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
   kali:
     build:
       context: .
@@ -63,15 +44,6 @@ services:
       context: .
       dockerfile: websearch.Dockerfile  # Web search MCP server
     container_name: mcp-websearch
-    networks:
-      - mcp-network
-    restart: unless-stopped
-
-  discovery:
-    build:
-      context: .
-      dockerfile: discovery.Dockerfile  # Lightweight web app discovery/spidering MCP server
-    container_name: mcp-discovery
     networks:
       - mcp-network
     restart: unless-stopped

@@ -218,6 +218,151 @@ docker-compose exec kali bash
 docker-compose exec zap-mcp sh
 ```
 
+## MCP CLI Usage and Examples
+
+The `mcp_cli.py` tool provides a comprehensive command-line interface for testing and debugging all MCP servers. It uses the FastMCP client API and is designed for manual testing, debugging, and exploration of MCP server capabilities.
+
+### Features
+- Container status checking
+- Server connection management
+- Tool discovery
+- Tool testing (send test payloads)
+- Interactive mode
+- Quick one-liner testing
+
+### Quick Start
+
+1. **Start the MCP Servers**
+   ```bash
+   docker-compose up -d
+   ```
+2. **Check Container Status**
+   ```bash
+   python mcp_cli.py --check-containers
+   ```
+3. **List Available Servers**
+   ```bash
+   python mcp_cli.py --list-servers
+   ```
+4. **Start Interactive Mode**
+   ```bash
+   python mcp_cli.py --interactive
+   ```
+
+### Usage Examples
+
+#### Interactive Mode (Recommended)
+```bash
+python mcp_cli.py -i
+```
+In interactive mode, you can:
+```
+mcp> connect kali
+mcp[kali]> list
+mcp[kali]> call nmap {"target": "127.0.0.1", "options": "-sV"}
+mcp[kali]> disconnect
+mcp> connect websearch
+mcp[websearch]> call search {"query": "python programming", "max_results": 3}
+```
+
+#### Quick Testing Commands
+
+- **Kali**
+  ```bash
+  python mcp_cli.py -s kali
+  python mcp_cli.py -s kali -t nmap -a '{"target": "127.0.0.1", "options": "-sV"}'
+  python mcp_cli.py -s kali -t gobuster -a '{"url": "https://example.com", "wordlist": "/usr/share/wordlists/dirb/common.txt"}'
+  ```
+- **ZAP**
+  ```bash
+  python mcp_cli.py -s zap
+  python mcp_cli.py -s zap -t spider -a '{"url": "https://example.com"}'
+  python mcp_cli.py -s zap -t alerts -a '{"risk_level": "High"}'
+  ```
+- **WebSearch**
+  ```bash
+  python mcp_cli.py -s websearch
+  python mcp_cli.py -s websearch -t search -a '{"query": "artificial intelligence", "max_results": 5}'
+  python mcp_cli.py -s websearch -t search_news -a '{"query": "cybersecurity", "max_results": 3}'
+  ```
+- **RAG**
+  ```bash
+  python mcp_cli.py -s rag
+  python mcp_cli.py -s rag -t search -a '{"query": "nmap", "max_results": 3}'
+  python mcp_cli.py -s rag -t store -a '{"category": "test", "content": "This is test content"}'
+  ```
+- **Discovery (OWASP)**
+  ```bash
+  python mcp_cli.py -s discovery
+  python mcp_cli.py -s discovery -t spider -a '{"url": "https://example.com", "max_urls": 5}'
+  python mcp_cli.py -s discovery -t check_headers -a '{"url": "https://example.com"}'
+  ```
+
+#### Interactive Mode Commands
+| Command | Description | Example |
+|---------|-------------|---------|
+| `connect <server>` | Connect to a specific server | `connect kali` |
+| `disconnect` | Disconnect from current server | `disconnect` |
+| `list` | List available tools | `list` |
+| `call <tool> <args>` | Call a tool with JSON arguments | `call nmap {"target": "127.0.0.1"}` |
+| `quit` / `exit` / `q` | Exit interactive mode | `quit` |
+
+#### Command Line Options
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--server` | `-s` | Target server for operations |
+| `--tool` | `-t` | Tool name to call |
+| `--args` | `-a` | JSON arguments for tool call |
+| `--interactive` | `-i` | Start interactive mode |
+| `--list-servers` | `-l` | List available servers |
+| `--check-containers` | `-c` | Check container status |
+
+#### Troubleshooting
+- **Missing containers**: `docker-compose up -d`
+- **Failed to connect**: Check containers with `docker ps | grep mcp-` and restart if needed
+- **Invalid JSON arguments**: Use single quotes and valid JSON
+- **Tool not found**: Use `list` to see available tools and check spelling
+
+---
+
+### Common Error: `ModuleNotFoundError: No module named 'fastmcp'`
+
+If you see this error when running `mcp_cli.py`:
+
+```
+Traceback (most recent call last):
+  File ".../mcp_cli.py", line 12, in <module>
+    from fastmcp import Client
+ModuleNotFoundError: No module named 'fastmcp'
+```
+
+**How to Fix:**
+
+**1. If you are using Poetry (recommended):**
+Run the CLI using Poetry, which uses the correct virtual environment:
+```bash
+poetry run python mcp_cli.py --list-servers
+```
+
+**2. If you want to run it with plain Python:**
+Install `fastmcp` in your current Python environment:
+```bash
+pip install fastmcp
+```
+Or, for Python 3.12 specifically:
+```bash
+python3.12 -m pip install fastmcp
+```
+
+**3. If you are using a virtual environment:**
+Activate the environment before running the script:
+```bash
+source .venv/bin/activate
+python mcp_cli.py --list-servers
+```
+
+If you still have issues, double-check your environment and how you are running the script.
+
 ## Performance Notes
 
 - **Memory Usage**: All services typically use 1-2GB RAM total

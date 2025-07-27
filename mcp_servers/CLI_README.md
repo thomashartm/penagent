@@ -178,6 +178,46 @@ python mcp_cli.py -s discovery -t check_headers -a '{"url": "https://example.com
    - Check tool name spelling
    - Verify you're connected to the right server
 
+---
+
+### Common Error: `ModuleNotFoundError: No module named 'fastmcp'`
+
+If you see this error when running `mcp_cli.py`:
+
+```
+Traceback (most recent call last):
+  File ".../mcp_cli.py", line 12, in <module>
+    from fastmcp import Client
+ModuleNotFoundError: No module named 'fastmcp'
+```
+
+**How to Fix:**
+
+**1. If you are using Poetry (recommended):**
+Run the CLI using Poetry, which uses the correct virtual environment:
+```bash
+poetry run python mcp_cli.py --list-servers
+```
+
+**2. If you want to run it with plain Python:**
+Install `fastmcp` in your current Python environment:
+```bash
+pip install fastmcp
+```
+Or, for Python 3.12 specifically:
+```bash
+python3.12 -m pip install fastmcp
+```
+
+**3. If you are using a virtual environment:**
+Activate the environment before running the script:
+```bash
+source .venv/bin/activate
+python mcp_cli.py --list-servers
+```
+
+If you still have issues, double-check your environment and how you are running the script.
+
 ### Debug Mode
 
 For detailed debugging, you can modify the CLI script to add more verbose logging:

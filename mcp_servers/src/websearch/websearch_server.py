@@ -139,4 +139,7 @@ async def search_images(query: str, max_results: int = 5, ctx: Context = None) -
     return output
 
 if __name__ == "__main__":
-    mcp.run() 
+    mcp.run()
+    import time
+    while True:
+        time.sleep(60) 

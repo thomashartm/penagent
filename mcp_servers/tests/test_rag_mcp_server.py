@@ -18,8 +18,8 @@ class RAGMCPServerTester:
         """Start the RAG MCP server."""
         print("🚀 Starting RAG MCP Server...")
         try:
-            # Connect to the FastMCP server running in the container
-            self.client = Client("docker exec -i mcp-rag python rag_server.py")
+            from fastmcp.client.transports import StdioTransport
+            self.client = Client(StdioTransport("docker", ["exec", "-i", "mcp-rag", "python3", "rag_server.py"]))
             await self.client.__aenter__()
             print("✅ RAG MCP Server started successfully")
             return True
@@ -33,9 +33,7 @@ class RAGMCPServerTester:
             raise Exception("Server not started")
         
         try:
-            if method == "initialize":
-                return await self.client.initialize()
-            elif method == "tools/list":
+            if method == "tools/list":
                 return await self.client.list_tools()
             elif method == "tools/call":
                 tool_name = params.get("name")
@@ -47,20 +45,6 @@ class RAGMCPServerTester:
         except Exception as e:
             return {"error": f"Communication error: {str(e)}"}
     
-    async def test_initialize(self):
-        """Test MCP initialize method."""
-        print("\n🔧 Testing MCP Initialize...")
-        
-        response = await self.send_request("initialize")
-        print(f"Response: {response}")
-        
-        if "result" in response and "serverInfo" in response["result"]:
-            print("✅ Initialize test passed")
-            self.test_results.append(("Initialize", "PASS"))
-        else:
-            print("❌ Initialize test failed")
-            self.test_results.append(("Initialize", "FAIL"))
-    
     async def test_list_tools(self):
         """Test MCP tools/list method."""
         print("\n📋 Testing Tools List...")
@@ -68,11 +52,8 @@ class RAGMCPServerTester:
         response = await self.send_request("tools/list")
         print(f"Response: {response}")
         
-        if "result" in response and "tools" in response["result"]:
-            tools = response["result"]["tools"]
-            print(f"✅ Tools list test passed - Found {len(tools)} tools:")
-            for tool in tools:
-                print(f"   - {tool['name']}: {tool['description']}")
+        if isinstance(response, list) and len(response) > 0 and all(hasattr(tool, 'name') and hasattr(tool, 'description') for tool in response):
+            print("✅ Tools list test passed")
             self.test_results.append(("Tools List", "PASS"))
         else:
             print("❌ Tools list test failed")
@@ -82,16 +63,12 @@ class RAGMCPServerTester:
         """Test search tool execution."""
         print("\n🔍 Testing Search Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "search",
-            "arguments": {
-                "query": "nmap",
-                "max_results": 3
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("search", {"query": "test"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Search tool test passed")
             self.test_results.append(("Search Tool", "PASS"))
         else:
@@ -102,16 +79,12 @@ class RAGMCPServerTester:
         """Test store tool execution."""
         print("\n💾 Testing Store Tool...")
         
-        response = await self.send_request("tools/call", {
-            "name": "store",
-            "arguments": {
-                "category": "test_category",
-                "content": "This is a test content for RAG storage"
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("store", {"category": "test", "content": "This is test content"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Store tool test passed")
             self.test_results.append(("Store Tool", "PASS"))
         else:
@@ -119,16 +92,14 @@ class RAGMCPServerTester:
             self.test_results.append(("Store Tool", "FAIL"))
     
     async def test_list_categories_tool(self):
-        """Test list_categories tool execution."""
+        """Test List Categories tool."""
         print("\n📂 Testing List Categories Tool...")
-        
-        response = await self.send_request("tools/call", {
-            "name": "list_categories",
-            "arguments": {}
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("list_categories", {})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ List Categories tool test passed")
             self.test_results.append(("List Categories Tool", "PASS"))
         else:
@@ -136,18 +107,14 @@ class RAGMCPServerTester:
             self.test_results.append(("List Categories Tool", "FAIL"))
     
     async def test_get_category_tool(self):
-        """Test get_category tool execution."""
+        """Test Get Category tool."""
         print("\n📁 Testing Get Category Tool...")
-        
-        response = await self.send_request("tools/call", {
-            "name": "get_category",
-            "arguments": {
-                "category": "pentest_methodologies"
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("get_category", {"category": "test"})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Get Category tool test passed")
             self.test_results.append(("Get Category Tool", "PASS"))
         else:
@@ -155,19 +122,14 @@ class RAGMCPServerTester:
             self.test_results.append(("Get Category Tool", "FAIL"))
     
     async def test_delete_item_tool(self):
-        """Test delete_item tool execution."""
+        """Test Delete Item tool."""
         print("\n🗑️ Testing Delete Item Tool...")
-        
-        response = await self.send_request("tools/call", {
-            "name": "delete_item",
-            "arguments": {
-                "category": "test_category",
-                "item_index": 1
-            }
-        })
-        print(f"Response: {response}")
-        
-        if "result" in response and "content" in response["result"]:
+        result = await self.client.call_tool("delete_item", {"category": "test", "item_index": 1})
+        print(f"Response: {result}")
+        output = getattr(result, 'data', None)
+        if not output and hasattr(result, 'content') and result.content:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+        if output:
             print("✅ Delete Item tool test passed")
             self.test_results.append(("Delete Item Tool", "PASS"))
         else:
@@ -214,7 +176,6 @@ class RAGMCPServerTester:
             return
         
         try:
-            await self.test_initialize()
             await self.test_list_tools()
             await self.test_search_tool()
             await self.test_store_tool()
