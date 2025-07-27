@@ -17,7 +17,10 @@ class MCPTestRunner:
         self.test_results = []
         self.test_files = [
             "test_kali_mcp_server.py",
-            "test_zap_mcp_server.py"
+            "test_zap_mcp_server.py",
+            "test_websearch_mcp_server.py",
+            "test_rag_mcp_server.py",
+            "test_discovery_mcp_server.py"
         ]
     
     async def run_test(self, test_file: str) -> Tuple[str, bool]:
@@ -63,7 +66,7 @@ class MCPTestRunner:
         """Check if required containers are running."""
         print("🔍 Checking if required containers are running...")
         
-        required_containers = ["mcp-kali", "mcp-zap"]
+        required_containers = ["mcp-kali", "mcp-zap", "mcp-websearch", "mcp-rag", "mcp-discovery"]
         running_containers = []
         
         try:
@@ -86,7 +89,7 @@ class MCPTestRunner:
             if missing_containers:
                 print(f"❌ Missing containers: {', '.join(missing_containers)}")
                 print("💡 Please start the containers first:")
-                print("   cd mcp_servers && docker-compose up -d kali zap")
+                print("   cd mcp_servers && docker-compose up -d kali zap websearch rag discovery")
                 return False
             else:
                 print("✅ All required containers are running")
@@ -153,7 +156,7 @@ class MCPTestRunner:
             print("🔧 You can now integrate them with your AI agents")
         else:
             print("🔧 Fix the failing tests before proceeding")
-            print("📖 Check the MCP_MIGRATION_GUIDE.md for troubleshooting tips")
+            print("📖 Check the CLI_README.md for troubleshooting tips")
 
 async def main():
     """Main function."""
