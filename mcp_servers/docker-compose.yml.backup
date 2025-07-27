@@ -5,21 +5,13 @@
 # Each service is documented with its purpose and the Dockerfile it uses.
 #
 # Services:
-#   - kali:      Kali Linux container with proper MCP server for shell/pentest tools (kali.Dockerfile)
-#   - websearch: Web search MCP server (websearch.Dockerfile)
-#   - discovery: Lightweight web app discovery/spidering MCP server (discovery.Dockerfile)
-#   - rag:       RAG knowledge base MCP server (rag.Dockerfile)
-#   - zap:       Combined ZAP daemon + proper MCP server (zap_combined.Dockerfile, port 8090)
+#   - kali:      Kali Linux container with MCP server for shell/pentest tools (kali.Dockerfile, port 8001)
+#   - websearch: Web search MCP server (websearch.Dockerfile, port 8002)
+#   - discovery: Lightweight web app discovery/spidering MCP server (discovery.Dockerfile, port 8003)
+#   - rag:       RAG knowledge base MCP server (rag.Dockerfile, port 8004)
+#   - zap:       OWASP ZAP daemon (official image, port 8090, internal use)
+#   - zap-mcp:   MCP server for ZAP API orchestration (zap.Dockerfile, port 8005)
 #   - playwright: Playwright browser automation (playwright.Dockerfile)
-#
-# Container Naming Convention:
-#   - MCP servers: mcp-{service} (e.g., mcp-kali, mcp-zap, mcp-websearch)
-#   - Non-MCP services: {prefix}-{service} (e.g., pentest-playwright)
-#
-# MCP Protocol:
-#   - All MCP servers use stdio communication (no HTTP ports needed)
-#   - Proper MCP protocol with tool schemas and validation
-#   - Interoperable with any MCP-compliant client
 #
 services:
   playwright:
@@ -32,28 +24,29 @@ services:
     volumes:
       - ../outputs:/app/outputs
 
-  zap:
+  zap-mcp:
     build:
       context: .
-      dockerfile: zap_combined.Dockerfile  # Combined ZAP daemon + MCP server
+      dockerfile: zap.Dockerfile  # MCP server for ZAP API
     container_name: mcp-zap
     ports:
-      - "8090:8090"  # ZAP API/UI (for debugging/access)
+      - "8005:8005"  # MCP ZAP server
+    depends_on:
+      zap:
+        condition: service_healthy
     networks:
       - mcp-network
+    environment:
+      - ZAP_API_BASE=http://zap:8090
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/JSON/core/view/version/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
   kali:
     build:
       context: .
       dockerfile: kali.Dockerfile  # Kali MCP server (shell/pentest tools)
-    container_name: mcp-kali
+    container_name: kali
+    ports:
+      - "8001:8001"  # MCP Kali server
     networks:
       - mcp-network
     restart: unless-stopped
@@ -63,6 +56,8 @@ services:
       context: .
       dockerfile: websearch.Dockerfile  # Web search MCP server
     container_name: mcp-websearch
+    ports:
+      - "8002:8002"  # MCP WebSearch server
     networks:
       - mcp-network
     restart: unless-stopped
@@ -72,6 +67,8 @@ services:
       context: .
       dockerfile: discovery.Dockerfile  # Lightweight web app discovery/spidering MCP server
     container_name: mcp-discovery
+    ports:
+      - "8003:8003"  # MCP Discovery server
     networks:
       - mcp-network
     restart: unless-stopped
@@ -81,6 +78,8 @@ services:
       context: .
       dockerfile: rag.Dockerfile  # RAG knowledge base MCP server
     container_name: mcp-rag
+    ports:
+      - "8004:8004"  # MCP RAG server
     networks:
       - mcp-network
     restart: unless-stopped

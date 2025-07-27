@@ -19,9 +19,9 @@ tools = {
     "WebBrowserTool": True,
     "WebSearchTool": True,
     "RAGTool": True,
-    "KaliContainerTool": os.system("docker ps | grep kali > /dev/null") == 0,
+            "KaliContainerTool": os.system("docker ps | grep mcp-kali > /dev/null") == 0,
     "Playwright": os.system("docker ps | grep pentest-playwright > /dev/null") == 0,
-    "ZAP": os.system("docker ps | grep pentest-zap > /dev/null") == 0,
+            "ZAP": os.system("docker ps | grep mcp-zap > /dev/null") == 0,
 }
 render_toolbar(tools)
 

@@ -1,46 +1,142 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+#!/usr/bin/env python3
+"""
+WebSearch MCP Server using FastMCP
+Provides web search functionality via MCP protocol.
+"""
+
 import asyncio
 import requests
 from bs4 import BeautifulSoup
+from fastmcp import FastMCP, Context
 
-app = FastAPI(title="WebSearch MCP Server", description="MCP server for web search functionality")
+# Create FastMCP server
+mcp = FastMCP("WebSearch MCP Server")
 
-@app.post('/run')
-async def run_tool(request: Request):
-    data = await request.json()
-    query = data.get('command', '')
-    async def event_stream():
-        yield f"Searching web for: {query}\n"
-        try:
-            # Use DuckDuckGo for search
-            search_url = f"https://duckduckgo.com/html/?q={query}"
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            response = requests.get(search_url, headers=headers, timeout=10)
-            response.raise_for_status()
+@mcp.tool
+async def search(query: str, max_results: int = 5, ctx: Context = None) -> str:
+    """Search the web for information.
+    
+    Args:
+        query: Search query
+        max_results: Maximum number of results to return (default: 5)
+    """
+    if ctx:
+        await ctx.info(f"Searching web for: {query}")
+    
+    output = f"Searching web for: {query}\n"
+    
+    try:
+        # Use DuckDuckGo for search
+        search_url = f"https://duckduckgo.com/html/?q={query}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(search_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        # Extract search results
+        for result in soup.find_all('a', class_='result__a')[:max_results]:
+            title = result.get_text(strip=True)
+            url = result.get('href', '')
+            if title and url:
+                results.append(f"- {title}: {url}")
+        
+        if results:
+            output += "Search results:\n"
+            for result in results:
+                output += result + "\n"
+        else:
+            output += "No results found.\n"
             
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
+    except Exception as e:
+        output += f"[ERROR] Search failed: {str(e)}\n"
+    
+    return output
+
+@mcp.tool
+async def search_news(query: str, max_results: int = 5, ctx: Context = None) -> str:
+    """Search for news articles.
+    
+    Args:
+        query: News search query
+        max_results: Maximum number of results to return (default: 5)
+    """
+    if ctx:
+        await ctx.info(f"Searching news for: {query}")
+    
+    output = f"Searching news for: {query}\n"
+    
+    try:
+        # Use DuckDuckGo news search
+        search_url = f"https://duckduckgo.com/html/?q={query}+news"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(search_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        # Extract news results
+        for result in soup.find_all('a', class_='result__a')[:max_results]:
+            title = result.get_text(strip=True)
+            url = result.get('href', '')
+            if title and url:
+                results.append(f"- {title}: {url}")
+        
+        if results:
+            output += "News results:\n"
+            for result in results:
+                output += result + "\n"
+        else:
+            output += "No news results found.\n"
             
-            # Extract search results
-            for result in soup.find_all('a', class_='result__a')[:5]:
-                title = result.get_text(strip=True)
-                url = result.get('href', '')
-                if title and url:
-                    results.append(f"- {title}: {url}")
+    except Exception as e:
+        output += f"[ERROR] News search failed: {str(e)}\n"
+    
+    return output
+
+@mcp.tool
+async def search_images(query: str, max_results: int = 5, ctx: Context = None) -> str:
+    """Search for images.
+    
+    Args:
+        query: Image search query
+        max_results: Maximum number of results to return (default: 5)
+    """
+    if ctx:
+        await ctx.info(f"Searching images for: {query}")
+    
+    output = f"Searching images for: {query}\n"
+    
+    try:
+        # Use DuckDuckGo image search
+        search_url = f"https://duckduckgo.com/html/?q={query}&iax=images&ia=images"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(search_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        # Extract image results
+        for result in soup.find_all('a', class_='result__a')[:max_results]:
+            title = result.get_text(strip=True)
+            url = result.get('href', '')
+            if title and url:
+                results.append(f"- {title}: {url}")
+        
+        if results:
+            output += "Image results:\n"
+            for result in results:
+                output += result + "\n"
+        else:
+            output += "No image results found.\n"
             
-            if results:
-                yield "Search results:\n"
-                for result in results:
-                    yield result + "\n"
-            else:
-                yield "No results found.\n"
-                
-        except Exception as e:
-            yield f"[ERROR] Search failed: {str(e)}\n"
-            
-    return StreamingResponse(event_stream(), media_type='text/plain')
+    except Exception as e:
+        output += f"[ERROR] Image search failed: {str(e)}\n"
+    
+    return output
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002) 
+    mcp.run() 

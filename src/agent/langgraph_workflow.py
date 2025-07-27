@@ -1,7 +1,7 @@
 # LangGraph workflow scaffold
 from src.agent.nodes.planner_node import PlannerNode
 from src.agent.nodes.llm_node import LLMNode
-from src.agent.nodes.mcp_client_node import MCPClientNode
+from src.agent.nodes.real_mcp_client_node import RealMCPClientNode
 from src.agent.nodes.logger_node import LoggerNode
 
 class ExpandedWorkflow:
@@ -10,7 +10,7 @@ class ExpandedWorkflow:
         self.job_id = job_id
         self.planner = PlannerNode(output_dir, job_id)
         self.llm = LLMNode(output_dir, job_id)
-        self.mcp = MCPClientNode(output_dir, job_id)
+        self.mcp = RealMCPClientNode(output_dir, job_id)
         self.logger = LoggerNode(output_dir, job_id)
 
     def run(self, task_prompt):
