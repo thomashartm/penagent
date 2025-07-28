@@ -1,29 +1,43 @@
 [tool.poetry]
-name = "pentest-agent"
+name = "penagent"
 version = "0.1.0"
-description = "Autonomous pentesting AI agent using langgraph."
-authors = ["Pentest-Architect <pentest-architect@example.com>"]
+description = "Core LangGraph orchestration for security testing phases"
+authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-packages = [{ include = "src" }]
+packages = [{include = "core"}]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<4.0"
-langgraph = "*"
-click = "*"
-rich = "*"
-requests = "*"
-playwright = "*"
-pinecone-client = "*"
-openai = "*"
-ollama = "*"
-streamlit-aggrid = "*"
-streamlit = "^1.47.0"
-mcp = "*"
-fastmcp = "*"
+python = "^3.12"
+langchain = "^0.3.26"
+langgraph = "^0.2.0"
+fastmcp = "^2.10.6"
+pydantic = "^2.0.0"
+click = "^8.1.0"
+rich = "^13.0.0"
+typer = "^0.9.0"
+langchain-community = "^0.3.27"
 
-[tool.poetry.dev-dependencies]
-pytest = "*"
-flake8 = "*"
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+pytest-asyncio = "^0.21.0"
+black = "^23.0.0"
+isort = "^5.12.0"
+mypy = "^1.0.0"
 
-[tool.poetry.scripts]
-pentest-agent = "src.cli:main" 
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true 
