@@ -4,11 +4,12 @@ LangGraph orchestrator for security testing phases.
 
 import asyncio
 import time
+import socket
+import re
 from typing import Dict, List, Any, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END, START
 from langchain_ollama import OllamaLLM
-import re
 import logging
 
 from .models import (
@@ -21,7 +22,7 @@ from .strategies.spidering import SpideringStrategy
 from .strategies.active_scanning import ActiveScanningStrategy
 from .strategies.evaluation import EvaluationStrategy
 from core.prompts.intent import get_intent_detection_prompt
-from core.prompts.chat import get_chat_response_prompt
+from core.prompts.chat import get_chat_response_prompt, get_security_system_prompt
 from core.prompts.plan import get_plan_security_test_prompt
 from core.prompts.report import get_generate_report_prompt
 
@@ -43,6 +44,43 @@ class SecurityOrchestrator:
             SecurityPhase.ACTIVE_SCANNING: ActiveScanningStrategy(),
             SecurityPhase.EVALUATION: EvaluationStrategy()
         }
+    
+    def resolve_target_to_ip(self, target: str) -> Dict[str, str]:
+        """Resolve target to IP address and return both domain and IP."""
+        result = {
+            "original_target": target,
+            "domain": None,
+            "ip_address": None,
+            "resolved": False
+        }
+        
+        # Clean the target (remove protocol if present)
+        clean_target = re.sub(r'^https?://', '', target.strip())
+        
+        # Check if it's already an IP address
+        ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+        if re.match(ip_pattern, clean_target):
+            result["ip_address"] = clean_target
+            result["resolved"] = True
+            return result
+        
+        # Try to resolve domain to IP
+        try:
+            # Remove port if present
+            domain = clean_target.split(':')[0]
+            ip_address = socket.gethostbyname(domain)
+            result["domain"] = domain
+            result["ip_address"] = ip_address
+            result["resolved"] = True
+            logging.info(f"Resolved {domain} to {ip_address}")
+        except socket.gaierror as e:
+            logging.warning(f"Could not resolve {clean_target}: {e}")
+            result["domain"] = clean_target
+        except Exception as e:
+            logging.error(f"Error resolving {clean_target}: {e}")
+            result["domain"] = clean_target
+        
+        return result
     
     def create_workflow(self) -> StateGraph:
         """Create the LangGraph workflow."""
@@ -72,13 +110,14 @@ class SecurityOrchestrator:
         
         return workflow
     
-    async def detect_intent(self, state: WorkflowState, job_id: str = None) -> WorkflowState:
+    async def detect_intent(self, state: WorkflowState) -> WorkflowState:
         """Detect user intent from input."""
         prompt = get_intent_detection_prompt(state.user_input.message)
         messages = [
-            SystemMessage(content="You are an AI assistant that analyzes user intent for security testing."),
+            SystemMessage(content=get_security_system_prompt()),
             HumanMessage(content=prompt)
         ]
+        job_id = state.job_id
         logging.info(f"[{job_id}] LLM intent detection call started.")
         response = await self.llm.ainvoke(messages)
         logging.info(f"[{job_id}] LLM intent detection call finished.")
@@ -115,27 +154,29 @@ class SecurityOrchestrator:
         )
         return state
     
-    async def chat_response(self, state: WorkflowState, job_id: str = None) -> WorkflowState:
+    async def chat_response(self, state: WorkflowState) -> WorkflowState:
         """Generate chat response."""
         prompt = get_chat_response_prompt(state.user_input.message)
         messages = [
-            SystemMessage(content="You are a helpful AI assistant."),
+            SystemMessage(content=get_security_system_prompt()),
             HumanMessage(content=prompt)
         ]
+        job_id = state.job_id
         logging.info(f"[{job_id}] LLM chat response call started.")
         response = await self.llm.ainvoke(messages)
         logging.info(f"[{job_id}] LLM chat response call finished.")
         state.chat_response = response
         return state
     
-    async def plan_security_test(self, state: WorkflowState, job_id: str = None) -> WorkflowState:
+    async def plan_security_test(self, state: WorkflowState) -> WorkflowState:
         """Plan the security testing phases."""
         target = state.intent_decision.target or "example.com"
         prompt = get_plan_security_test_prompt(target, state.user_input.message)
         messages = [
-            SystemMessage(content="You are a security testing planner."),
+            SystemMessage(content=get_security_system_prompt()),
             HumanMessage(content=prompt)
         ]
+        job_id = state.job_id
         logging.info(f"[{job_id}] LLM plan security test call started.")
         response = await self.llm.ainvoke(messages)
         logging.info(f"[{job_id}] LLM plan security test call finished.")
@@ -149,8 +190,19 @@ class SecurityOrchestrator:
         )
         return state
     
-    async def execute_phase(self, state: WorkflowState, job_id: str = None) -> WorkflowState:
+    async def execute_phase(self, state: WorkflowState) -> WorkflowState:
         """Execute security testing phases."""
+        job_id = state.job_id
+        
+        # Resolve target to IP for tools that need it
+        target_info = self.resolve_target_to_ip(state.security_plan.target)
+        if target_info["resolved"]:
+            print(f"📍 Target resolved: {target_info['domain']} -> {target_info['ip_address']}")
+            logging.info(f"[{job_id}] Target resolved: {target_info['domain']} -> {target_info['ip_address']}")
+        else:
+            print(f"⚠️  Could not resolve {target_info['original_target']} to IP address")
+            logging.warning(f"[{job_id}] Could not resolve {target_info['original_target']} to IP address")
+        
         async with self.mcp_manager:
             for phase in state.security_plan.phases:
                 logging.info(f"[{job_id}] Starting phase: {phase.value} for {state.security_plan.target}")
@@ -163,10 +215,19 @@ class SecurityOrchestrator:
                 for result in state.phase_results:
                     if result.findings:
                         previous_findings.extend(result.findings)
+                
+                # Prepare context with resolved IP information
+                context = {
+                    "previous_findings": previous_findings,
+                    "target_info": target_info,
+                    "domain": target_info["domain"],
+                    "ip_address": target_info["ip_address"]
+                }
+                
                 # Execute phase tools
                 logging.info(f"[{job_id}] Executing tools for phase: {phase.value}")
                 tool_results = await self.mcp_manager.execute_phase_tools(
-                    phase, state.security_plan.target, {"previous_findings": previous_findings}
+                    phase, state.security_plan.target, context
                 )
                 logging.info(f"[{job_id}] Finished executing tools for phase: {phase.value}")
                 # Process tool results
@@ -211,8 +272,9 @@ class SecurityOrchestrator:
                 print(f"   Tools used: {', '.join(tools_used) if tools_used else 'None'}")
         return state
     
-    async def generate_report(self, state: WorkflowState, job_id: str = None) -> WorkflowState:
+    async def generate_report(self, state: WorkflowState) -> WorkflowState:
         """Generate final security assessment report."""
+        job_id = state.job_id
         # Collect all findings and errors
         all_findings = []
         all_errors = []
@@ -223,7 +285,7 @@ class SecurityOrchestrator:
                 all_errors.append(result.error)
         prompt = get_generate_report_prompt(state.security_plan.target, all_findings)
         messages = [
-            SystemMessage(content="You are a security assessment report writer."),
+            SystemMessage(content=get_security_system_prompt()),
             HumanMessage(content=prompt)
         ]
         logging.info(f"[{job_id}] LLM report generation call started.")
@@ -246,7 +308,8 @@ class SecurityOrchestrator:
             user_input=UserInput(
                 message=user_input,
                 target=target
-            )
+            ),
+            job_id=job_id
         )
         
         # Create and run workflow
@@ -254,12 +317,6 @@ class SecurityOrchestrator:
         app = workflow.compile()
         
         # Run the workflow
-        # Patch: propagate job_id to all nodes
-        app._nodes["detect_intent"] = lambda s: self.detect_intent(s, job_id=job_id)
-        app._nodes["chat_node"] = lambda s: self.chat_response(s, job_id=job_id)
-        app._nodes["plan_security_test"] = lambda s: self.plan_security_test(s, job_id=job_id)
-        app._nodes["execute_phase"] = lambda s: self.execute_phase(s, job_id=job_id)
-        app._nodes["generate_report"] = lambda s: self.generate_report(s, job_id=job_id)
         final_state = await app.ainvoke(state)
         
         return final_state 

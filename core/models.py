@@ -64,6 +64,7 @@ class WorkflowState(BaseModel):
     chat_response: Optional[str] = Field(None, description="Response for chat intent")
     final_report: Optional[str] = Field(None, description="Final security testing report")
     errors: List[str] = Field(default_factory=list, description="Any errors encountered")
+    job_id: Optional[str] = Field(None, description="Job ID for tracking and logging")
 
 
 class MCPToolResult(BaseModel):

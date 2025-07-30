@@ -165,6 +165,7 @@ class MCPClientManager:
         
         return results
     
+    @staticmethod
     def resolve_to_ip(target: str) -> str:
         """Resolve a hostname or URL to its IP address. If already an IP, return as is."""
         # Extract hostname from URL if needed
@@ -189,16 +190,31 @@ class MCPClientManager:
     def _prepare_tool_arguments(self, tool_name: str, target: str, phase: SecurityPhase, context: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare arguments for tool execution based on tool name and phase. Only pass required arguments."""
         args = {}
+        
+        # Get resolved IP information from context if available
+        target_info = context.get("target_info", {}) if context else {}
+        ip_address = target_info.get("ip_address")
+        domain = target_info.get("domain", target)
+        
         # Tools that require IP resolution
-        ip_tools = {"nmap", "nuclei", "hydra"}
-        ip_target = resolve_to_ip(target) if tool_name in ip_tools else target
+        ip_tools = {"nmap", "nuclei", "hydra", "masscan"}
+        
+        # Use resolved IP for tools that need it, fallback to domain resolution if not in context
+        if tool_name in ip_tools:
+            if ip_address:
+                tool_target = ip_address
+            else:
+                tool_target = MCPClientManager.resolve_to_ip(target)
+        else:
+            tool_target = target
+        
         # Kali tools
         if tool_name == "nmap":
-            args = {"target": ip_target}
+            args = {"target": tool_target}
             if phase == SecurityPhase.INFORMATION_GATHERING:
                 args["options"] = "-sV -sC -p-"
         elif tool_name == "nuclei":
-            args = {"target": ip_target}
+            args = {"target": tool_target}
             if phase == SecurityPhase.ACTIVE_SCANNING:
                 args["template"] = "cves"
         elif tool_name == "whatweb":
@@ -208,7 +224,7 @@ class MCPClientManager:
         elif tool_name == "sublist3r":
             args = {"domain": target}
         elif tool_name == "hydra":
-            args = {"target": ip_target}
+            args = {"target": tool_target}
         elif tool_name == "metasploit":
             args = {"command": "help"}  # Placeholder, should be orchestrated
         elif tool_name == "shell_command":
