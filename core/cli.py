@@ -10,6 +10,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
+import logging
+import sys
+import os
+from datetime import datetime
 
 from .orchestrator import SecurityOrchestrator
 
@@ -18,6 +23,26 @@ app = typer.Typer(help="Security Testing Orchestration CLI.\n\n"
     "For Ollama, use --model ollama/llama3 (or any local model name).\n"
 )
 console = Console()
+
+# Generate a job ID for each run (timestamp-based, human readable)
+def generate_job_id():
+    return datetime.now().strftime("job_%Y%m%d_%H%M%S")
+
+def get_log_dir(job_id):
+    log_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", job_id)
+    os.makedirs(log_dir, exist_ok=True)
+    return log_dir
+
+def get_log_file(job_id):
+    return os.path.join(get_log_dir(job_id), "orchestrator_debug.log")
+
+def setup_logging(log_file):
+    logging.basicConfig(
+        filename=log_file,
+        filemode="a",
+        format="%(asctime)s %(levelname)s: %(message)s",
+        level=logging.INFO
+    )
 
 
 @app.command()
@@ -28,6 +53,10 @@ def scan(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
     """Conduct security testing on a target."""
+    job_id = generate_job_id()
+    log_file = get_log_file(job_id)
+    setup_logging(log_file)
+    console.print(f"[bold blue]Job ID:[/bold blue] {job_id}")
     if verbose:
         console.print(f"🎯 Target: {target}")
         console.print(f"💬 Message: {message or 'Default security scan'}")
@@ -37,7 +66,7 @@ def scan(
     if not message:
         message = f"Conduct a comprehensive security assessment of {target}"
     
-    asyncio.run(run_security_scan(target, message, model, verbose))
+    asyncio.run(run_security_scan(target, message, model, verbose, job_id))
 
 
 @app.command()
@@ -46,13 +75,17 @@ def chat(
     model: str = typer.Option("ollama/llama3", "--model", help="LLM model to use (e.g. ollama/llama3)")
 ):
     """Chat with the AI assistant."""
+    job_id = generate_job_id()
+    log_file = get_log_file(job_id)
+    setup_logging(log_file)
+    console.print(f"[bold blue]Job ID:[/bold blue] {job_id}")
     console.print(f"💬 Message: {message}")
     console.print(f"🤖 Model: {model}")
     
-    asyncio.run(run_chat(message, model))
+    asyncio.run(run_chat(message, model, job_id))
 
 
-async def run_security_scan(target: str, message: str, model: str, verbose: bool):
+async def run_security_scan(target: str, message: str, model: str, verbose: bool, job_id: str):
     """Run a security scan workflow."""
     try:
         console.print(Panel.fit(
@@ -63,22 +96,28 @@ async def run_security_scan(target: str, message: str, model: str, verbose: bool
             title="Security Testing Orchestrator",
             border_style="blue"
         ))
-        
         # Initialize orchestrator
         orchestrator = SecurityOrchestrator(llm_model=model)
-        
-        # Run workflow
-        final_state = await orchestrator.run_workflow(message, target)
-        
+        log_file = get_log_file(job_id)
+        # Show spinner while processing
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+            task = progress.add_task("Processing...", start=True)
+            orig_stdout = sys.stdout
+            sys.stdout = open(log_file, "a")
+            try:
+                final_state = await orchestrator.run_workflow(message, target, job_id=job_id)
+            finally:
+                sys.stdout.close()
+                sys.stdout = orig_stdout
+            progress.update(task, description="Done.")
         # Display results
         display_results(final_state, verbose)
-        
     except Exception as e:
         console.print(f"❌ Error: {e}", style="red")
         sys.exit(1)
 
 
-async def run_chat(message: str, model: str):
+async def run_chat(message: str, model: str, job_id: str):
     """Run a chat workflow."""
     try:
         console.print(Panel.fit(
@@ -88,13 +127,20 @@ async def run_chat(message: str, model: str):
             title="AI Assistant",
             border_style="green"
         ))
-        
         # Initialize orchestrator
         orchestrator = SecurityOrchestrator(llm_model=model)
-        
-        # Run workflow
-        final_state = await orchestrator.run_workflow(message)
-        
+        log_file = get_log_file(job_id)
+        # Show spinner while processing
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+            task = progress.add_task("Processing...", start=True)
+            orig_stdout = sys.stdout
+            sys.stdout = open(log_file, "a")
+            try:
+                final_state = await orchestrator.run_workflow(message, job_id=job_id)
+            finally:
+                sys.stdout.close()
+                sys.stdout = orig_stdout
+            progress.update(task, description="Done.")
         # Ensure final_state is a WorkflowState (handle AddableValuesDict from LangGraph)
         from core.models import WorkflowState
         if not isinstance(final_state, WorkflowState):
@@ -108,7 +154,6 @@ async def run_chat(message: str, model: str):
             ))
         else:
             console.print("❌ No response generated", style="red")
-            
     except Exception as e:
         console.print(f"❌ Error: {e}", style="red")
         sys.exit(1)

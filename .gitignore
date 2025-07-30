@@ -13,3 +13,4 @@ dist/
 poetry.lock
 process_logs.json 
 outputs/
+.backup/

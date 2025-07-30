@@ -7,6 +7,7 @@ import time
 from typing import Dict, List, Optional, Any
 from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
+import socket
 
 from .models import MCPToolResult, SecurityPhase
 
@@ -164,30 +165,69 @@ class MCPClientManager:
         
         return results
     
+    def resolve_to_ip(target: str) -> str:
+        """Resolve a hostname or URL to its IP address. If already an IP, return as is."""
+        # Extract hostname from URL if needed
+        if target.startswith("http://") or target.startswith("https://"):
+            from urllib.parse import urlparse
+            hostname = urlparse(target).hostname
+        else:
+            hostname = target
+        # If already an IP, return
+        try:
+            socket.inet_aton(hostname)
+            return hostname
+        except Exception:
+            pass
+        # Try to resolve
+        try:
+            ip = socket.gethostbyname(hostname)
+            return ip
+        except Exception:
+            return target  # fallback to original if resolution fails
+    
     def _prepare_tool_arguments(self, tool_name: str, target: str, phase: SecurityPhase, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare arguments for tool execution based on tool name and phase."""
-        base_args = {}
-        
-        if tool_name in ["nmap", "nuclei", "whatweb"]:
-            base_args["target"] = target
-        elif tool_name in ["gobuster", "nikto"]:
-            base_args["url"] = target if target.startswith(("http://", "https://")) else f"https://{target}"
-        elif tool_name in ["sublist3r"]:
-            base_args["domain"] = target
-        elif tool_name in ["search", "search_news"]:
-            base_args["query"] = f"{target} security vulnerabilities"
-        elif tool_name in ["search"] and phase == SecurityPhase.EVALUATION:
-            base_args["query"] = f"security assessment {target} findings"
-        elif tool_name in ["store"]:
-            base_args["category"] = f"{phase.value}_{target}"
-            base_args["content"] = f"Security testing results for {target} in {phase.value} phase"
-        elif tool_name in ["list_categories", "get_category"]:
-            base_args["category"] = f"{phase.value}_{target}"
-        
-        # Add phase-specific arguments
-        if phase == SecurityPhase.INFORMATION_GATHERING and tool_name == "nmap":
-            base_args["options"] = "-sV -sC -p-"
-        elif phase == SecurityPhase.ACTIVE_SCANNING and tool_name == "nuclei":
-            base_args["template"] = "cves"
-        
-        return base_args 
+        """Prepare arguments for tool execution based on tool name and phase. Only pass required arguments."""
+        args = {}
+        # Tools that require IP resolution
+        ip_tools = {"nmap", "nuclei", "hydra"}
+        ip_target = resolve_to_ip(target) if tool_name in ip_tools else target
+        # Kali tools
+        if tool_name == "nmap":
+            args = {"target": ip_target}
+            if phase == SecurityPhase.INFORMATION_GATHERING:
+                args["options"] = "-sV -sC -p-"
+        elif tool_name == "nuclei":
+            args = {"target": ip_target}
+            if phase == SecurityPhase.ACTIVE_SCANNING:
+                args["template"] = "cves"
+        elif tool_name == "whatweb":
+            args = {"target": target}
+        elif tool_name == "gobuster" or tool_name == "nikto":
+            args = {"url": target if target.startswith(("http://", "https://")) else f"https://{target}"}
+        elif tool_name == "sublist3r":
+            args = {"domain": target}
+        elif tool_name == "hydra":
+            args = {"target": ip_target}
+        elif tool_name == "metasploit":
+            args = {"command": "help"}  # Placeholder, should be orchestrated
+        elif tool_name == "shell_command":
+            args = {"command": "whoami"}  # Placeholder, should be orchestrated
+        elif tool_name == "google_dork":
+            args = {"query": f"site:{target} inurl:admin"}
+        elif tool_name == "recon-ng":
+            args = {"domain": target}
+        # Websearch tools
+        elif tool_name == "search" or tool_name == "search_news":
+            args = {"query": f"{target} security vulnerabilities"}
+            if phase == SecurityPhase.EVALUATION:
+                args["query"] = f"security assessment {target} findings"
+        # RAG tools
+        elif tool_name == "store":
+            args = {"category": f"{phase.value}_{target}", "content": f"Security testing results for {target} in {phase.value} phase"}
+        elif tool_name == "get_category":
+            args = {"category": f"{phase.value}_{target}"}
+        # Only pass category to get_category, not to list_categories
+        elif tool_name == "list_categories":
+            args = {}  # list_categories takes no arguments
+        return args 

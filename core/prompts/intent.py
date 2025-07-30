@@ -10,11 +10,11 @@ Determine if the user wants to:
 1. CHAT - Have a conversation, ask questions, or get general information
 2. SECURITY_TESTING - Conduct security testing, vulnerability scanning, or pentesting
 
-For SECURITY_TESTING intent, also extract the target (domain, IP, or URL).
+If the user requests security testing, EXTRACT the target domain, IP, or URL from the input. If the input contains a URL, domain, or IP, return it exactly as provided by the user. If not, return 'None'.
 
-Respond with:
-- Intent: CHAT or SECURITY_TESTING
-- Confidence: 0.0 to 1.0
-- Reasoning: Brief explanation
-- Target: Extracted target (if security testing)
+Respond in the following format:
+Intent: CHAT or SECURITY_TESTING
+Confidence: <float between 0.0 and 1.0>
+Reasoning: <brief explanation>
+Target: <extracted target domain, IP, or URL, or None>
 """ 
